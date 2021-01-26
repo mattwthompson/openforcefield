@@ -145,6 +145,10 @@ class ChargeCalculationError(MessageException):
     """An unhandled error occured in an external toolkit during charge calculation"""
 
 
+class ConformerGenerationError(MessageException):
+    """An unhandled error occured in an external toolkit during conformer generation"""
+
+
 class InvalidIUPACNameError(MessageException):
     """Failed to parse IUPAC name"""
 
@@ -2099,6 +2103,9 @@ class OpenEyeToolkitWrapper(ToolkitWrapper):
             if new_status is False:
                 raise Exception("OpenEye Omega conformer generation failed")
 
+        if oemol.NumConfs() == 0:
+            raise ConformerGenerationError
+
         molecule2 = self.from_openeye(
             oemol, allow_undefined_stereo=True, _cls=molecule.__class__
         )
@@ -3355,6 +3362,10 @@ class RDKitToolkitWrapper(ToolkitWrapper):
             randomSeed=1,
             # params=AllChem.ETKDG()
         )
+
+        if rdmol.GetNumConformers() == 0:
+            raise ConformerGenerationError
+
         molecule2 = self.from_rdkit(
             rdmol, allow_undefined_stereo=True, _cls=molecule.__class__
         )
