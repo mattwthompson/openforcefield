@@ -4,7 +4,11 @@ import numpy as np
 import pytest
 from simtk import unit
 
-from openff.toolkit.tests.utils import get_data_file_path, requires_rdkit
+from openff.toolkit.tests.utils import (
+    get_context_potential_energy,
+    get_data_file_path,
+    requires_rdkit,
+)
 from openff.toolkit.topology import Molecule, Topology
 from openff.toolkit.typing.engines.smirnoff import ForceField
 
@@ -40,11 +44,19 @@ def test_reference(constrained, mol):
     simulation = _build_simulation(omm_sys=omm_sys, off_top=off_top)
     derived_energy = _get_energy(simulation=simulation, positions=positions)
 
-    np.testing.assert_almost_equal(
-        actual=derived_energy / unit.kilojoule_per_mole,
-        desired=reference_energy,
-        decimal=5,
-    )
+    try:
+        np.testing.assert_almost_equal(
+            actual=derived_energy / unit.kilojoule_per_mole,
+            desired=reference_energy,
+            decimal=5,
+        )
+    except AssertionError as e:
+        msg = (
+            str(e)
+            + "\nAll forces:\n\t"
+            + str(_get_energy_by_force_group(simulation, positions))
+        )
+        raise AssertionError(msg)
 
 
 def generate_reference():
@@ -134,6 +146,25 @@ def _get_energy(simulation, positions):
     energy = state.getPotentialEnergy()
 
     return energy
+
+
+def _get_energy_by_force_group(simulation, positions):
+    simulation.context.setPositions(positions)
+
+    force_names = {f.__class__.__name__ for f in simulation.system.getForces()}
+    group_to_force = {i: force_name for i, force_name in enumerate(force_names)}
+    force_to_group = {force_name: i for i, force_name in group_to_force.items()}
+
+    for force in simulation.system.getForces():
+        force.setForceGroup(force_to_group[force.__class__.__name__])
+
+    energies = get_context_potential_energy(
+        context=simulation.context,
+        positions=positions,
+        by_force_group=True,
+    )
+
+    return {group_to_force[idx]: energies[idx] for idx in energies.keys()}
 
 
 if __name__ == "__main__":
