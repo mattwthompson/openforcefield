@@ -1,5 +1,6 @@
 import json
 
+from simtk import openmm, unit
 import numpy as np
 import pytest
 from simtk import unit
@@ -113,6 +114,14 @@ def _build_system(mol, constrained):
 
     omm_sys = parsley.create_openmm_system(off_top, toolkit_registry=toolkit_registry)
 
+    sum_ = 0 * unit.elementary_charge
+    for i in range(omm_sys.getNumForces()):
+        force = omm_sys.getForce(i)
+        if type(force) == openmm.NonbondedForce:
+            for j in range(force.getNumParticles()):
+                sum_ += force.getParticleParameters(j)[0]
+
+    print(mol, "\t", constrained, "\t", str(sum_), "\n")
     return omm_sys, positions, off_top
 
 
